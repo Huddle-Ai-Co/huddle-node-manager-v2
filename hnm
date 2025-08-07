@@ -1,0 +1,1008 @@
+#!/bin/bash
+
+# HNM (Huddle Node Manager) - Modern IPFS Node Management
+# A modern wrapper around the existing IPFS infrastructure with enhanced UX
+# Provides backward compatibility with original Huddle IPFS Node Manager commands
+
+# Define standard paths following enterprise best practices
+# Smart path detection based on installation mode
+if [ -d "/usr/local/lib/huddle-node-manager" ]; then
+    # System-wide installation
+    HNM_LIB_DIR="/usr/local/lib/huddle-node-manager"
+    HNM_DOC_DIR="/usr/local/share/doc/huddle-node-manager"
+    HNM_CONFIG_DIR="/etc/huddle-node-manager"
+elif [ -d "$HOME/.local/lib/huddle-node-manager" ]; then
+    # User-local installation
+    HNM_LIB_DIR="$HOME/.local/lib/huddle-node-manager"
+    HNM_DOC_DIR="$HOME/.local/share/doc/huddle-node-manager"
+    HNM_CONFIG_DIR="$HOME/.config/huddle-node-manager"
+else
+    # Portable installation - find relative to hnm location
+    HNM_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    HNM_LIB_DIR="$(dirname "$HNM_SCRIPT_DIR")/lib"
+    HNM_DOC_DIR="$(dirname "$HNM_SCRIPT_DIR")/docs"
+    HNM_CONFIG_DIR="$(dirname "$HNM_SCRIPT_DIR")/config"
+fi
+
+# HNM Configuration
+HNM_VERSION="2.0.0"
+HNM_HOME="$HOME/.hnm"
+HNM_CONFIG="$HNM_HOME/config.json"
+HNM_LOGS="$HNM_HOME/logs"
+
+# Library script paths
+CONTENT_MANAGER="$HNM_LIB_DIR/ipfs-content-manager.sh"
+SEARCH_MANAGER="$HNM_LIB_DIR/ipfs-search-manager.sh"
+TROUBLESHOOT_MANAGER="$HNM_LIB_DIR/ipfs-troubleshoot-manager.sh"
+DAEMON_MANAGER="$HNM_LIB_DIR/ipfs-daemon-manager.sh"
+CLUSTER_MANAGER="$HNM_LIB_DIR/ipfs-cluster-manager.sh"
+WEBUI_SCRIPT="$HNM_LIB_DIR/open-ipfs-webui.sh"
+API_KEY_MANAGER="$HNM_LIB_DIR/api_key_manager.sh"
+
+# Docker and testing infrastructure paths
+DOCKER_DIR="$HNM_LIB_DIR/docker"
+TESTING_DIR="$HNM_LIB_DIR/testing"
+DOCKER_BUILD_SCRIPT="$DOCKER_DIR/build-test-environments.sh"
+TEST_DYNAMIC_SCRIPT="$TESTING_DIR/test_installation_paths_dynamic.sh"
+TEST_LINUX_SCRIPT="$TESTING_DIR/test_linux_compatibility.sh"
+TEST_WINDOWS_SCRIPT="$TESTING_DIR/test_windows_compatibility.bat"
+TEST_MACOS_SCRIPT="$TESTING_DIR/test_installation_paths.sh"
+
+# Ensure HNM directories exist
+mkdir -p "$HNM_HOME" "$HNM_LOGS"
+
+# Colors and emojis for modern UX
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Modern logging functions with emojis
+log_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+log_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+log_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+log_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+log_step() {
+    echo -e "${CYAN}🔄 $1${NC}"
+}
+
+# Legacy helper has been removed - HNM now provides all functionality directly
+
+# Check if specialized manager exists
+check_manager() {
+    local manager="$1"
+    if [ ! -f "$manager" ]; then
+        log_warning "Manager not found: $manager"
+        log_info "Falling back to legacy helper"
+        return 1
+    fi
+    
+    # Make sure it's executable
+    if [ ! -x "$manager" ]; then
+        chmod +x "$manager"
+    fi
+    
+    return 0
+}
+
+# Backward compatibility: Handle original Huddle IPFS Node Manager commands
+handle_legacy_command() {
+    local script_name=$(basename "$0")
+    
+    case "$script_name" in
+        "ipfs-setup")
+            log_info "Running legacy ipfs-setup command via HNM"
+            setup_hnm "$@"
+            ;;
+        "ipfs-manager")
+            log_info "Running legacy ipfs-manager command via HNM"
+            if [ $# -eq 0 ]; then
+                show_help
+            else
+                main "$@"
+            fi
+            ;;
+        "ipfs-manager-version")
+            log_info "Running legacy ipfs-manager-version command via HNM"
+            echo "Huddle IPFS Node Manager v$HNM_VERSION"
+            echo "Now running as HNM (Huddle Node Manager) with enhanced features"
+            log_info "Use 'hnm --version' for the modern command"
+            ;;
+        "ipfs-manager-uninstall")
+            log_info "Running legacy ipfs-manager-uninstall command via HNM"
+            uninstall_hnm "$@"
+            ;;
+        *)
+            return 1  # Not a legacy command
+            ;;
+    esac
+    return 0
+}
+
+# Modern setup function
+setup_hnm() {
+    log_step "Setting up Huddle Node Manager (HNM)..."
+    
+    # Create config if it doesn't exist
+    if [ ! -f "$HNM_CONFIG" ]; then
+        cat > "$HNM_CONFIG" << EOF
+{
+    "version": "$HNM_VERSION",
+    "initialized": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "features": {
+        "legacy_compatibility": true,
+        "modern_ui": true,
+        "enhanced_logging": true
+    },
+    "paths": {
+        "logs": "$HNM_LOGS",
+        "lib": "$HNM_LIB_DIR"
+    },
+    "migration": {
+        "from": "Huddle IPFS Node Manager",
+        "original_commands": ["ipfs-setup", "ipfs-manager", "ipfs-manager-version", "ipfs-manager-uninstall"],
+        "new_commands": ["hnm setup", "hnm help", "hnm --version", "hnm uninstall"]
+    }
+}
+EOF
+        log_success "Created HNM configuration"
+    fi
+    
+    # Initialize IPFS node using modern daemon manager
+    if check_manager "$DAEMON_MANAGER"; then
+        log_step "Initializing IPFS node..."
+        "$DAEMON_MANAGER" start
+    else
+        log_warning "Daemon manager not found. Please run: hnm start"
+    fi
+    
+    log_success "HNM setup completed!"
+    log_info "Use 'hnm status' to check your node status"
+    
+    # Show migration info if this was called via legacy command
+    if [ "$(basename "$0")" = "ipfs-setup" ]; then
+        echo ""
+        log_info "💡 Migration Notice:"
+        echo "   Old command: ipfs-setup"
+        echo "   New command: hnm setup"
+        echo "   Both work, but 'hnm' provides enhanced features!"
+    fi
+}
+
+# Enhanced status with modern UI
+show_status() {
+    log_step "Checking Huddle Node Manager status..."
+    echo ""
+    
+    # Show HNM version info
+    echo -e "${PURPLE}🏠 Huddle Node Manager (HNM)${NC}"
+    echo -e "   Version: ${CYAN}$HNM_VERSION${NC}"
+    echo -e "   Config:  ${CYAN}$HNM_CONFIG${NC}"
+    echo -e "   Legacy:  ${CYAN}Compatible with original Huddle IPFS Node Manager${NC}"
+    echo ""
+    
+    # Use daemon manager for status
+    if check_manager "$DAEMON_MANAGER"; then
+        "$DAEMON_MANAGER" status
+    else
+        log_warning "Daemon manager not found. Basic status check:"
+        if command -v ipfs &> /dev/null; then
+            if ipfs swarm peers &>/dev/null; then
+                echo -e "${GREEN}✅ IPFS daemon is running${NC}"
+            else
+                echo -e "${RED}❌ IPFS daemon is not running${NC}"
+            fi
+        else
+            echo -e "${RED}❌ IPFS not installed${NC}"
+        fi
+    fi
+}
+
+# Start services
+start_services() {
+    log_step "Starting Huddle Node Manager services..."
+    
+    if check_manager "$DAEMON_MANAGER"; then
+        "$DAEMON_MANAGER" start
+    else
+        log_error "Daemon manager not found at: $DAEMON_MANAGER"
+        log_info "Please ensure HNM is properly installed"
+        return 1
+    fi
+}
+
+# Stop services
+stop_services() {
+    log_step "Stopping Huddle Node Manager services..."
+    
+    if check_manager "$DAEMON_MANAGER"; then
+        "$DAEMON_MANAGER" stop
+    else
+        log_warning "Stop command requires daemon manager"
+    fi
+}
+
+# Restart services
+restart_services() {
+    log_step "Restarting Huddle Node Manager services..."
+    
+    if check_manager "$DAEMON_MANAGER"; then
+        "$DAEMON_MANAGER" restart
+    else
+        log_warning "Restart command requires daemon manager"
+    fi
+}
+
+# Modern content management
+manage_content() {
+    if [ -z "$1" ]; then
+        echo -e "${PURPLE}📁 Content Management${NC}"
+        echo ""
+        echo -e "${YELLOW}Usage:${NC} hnm content [command] [options]"
+        echo ""
+        echo -e "${YELLOW}Commands:${NC}"
+        echo "  add <file>     - Add file to IPFS"
+        echo "  list           - List pinned content"
+        echo "  remove <hash>  - Remove/unpin content by hash"
+        echo "  search <term>  - Search content"
+        echo "  info <hash>    - Show content info"
+        echo ""
+        return 0
+    fi
+    
+    # Route to content manager
+    if check_manager "$CONTENT_MANAGER"; then
+        "$CONTENT_MANAGER" "$@"
+    else
+        log_error "Content manager not found at: $CONTENT_MANAGER"
+        log_info "Please ensure HNM is properly installed"
+        return 1
+    fi
+}
+
+# Modern community management
+manage_community() {
+    if [ -z "$1" ]; then
+        echo -e "${PURPLE}👥 Community Management${NC}"
+        echo ""
+        echo -e "${YELLOW}Usage:${NC} hnm community [command] [options]"
+        echo ""
+        echo -e "${YELLOW}Commands:${NC}"
+        echo "  peers          - Show connected peers"
+        echo "  peers --detailed - Show detailed peer information"
+        echo "  connect <addr> - Connect to peer"
+        echo "  info           - Show node information"
+        echo "  bandwidth      - Show bandwidth stats"
+        echo ""
+        return 0
+    fi
+    
+    # Route to cluster manager - pass all arguments including flags
+    if check_manager "$CLUSTER_MANAGER"; then
+        "$CLUSTER_MANAGER" "$@"
+    else
+        log_warning "Community management requires cluster manager"
+        log_info "Basic peer info available via: ipfs swarm peers"
+    fi
+}
+
+# Modern search functionality
+manage_search() {
+    if [ -z "$1" ]; then
+        echo -e "${PURPLE}🔍 Search Management${NC}"
+        echo ""
+        echo -e "${YELLOW}Usage:${NC} hnm search [command] [options]"
+        echo ""
+        echo -e "${YELLOW}Commands:${NC}"
+        echo "  index <file>   - Index a specific file for search"
+        echo "  build          - Build/rebuild search index for all content"
+        echo "  query <term>   - Search indexed content with semantic search"
+        echo "  list           - List search indices and status"
+        echo ""
+        echo -e "${YELLOW}Examples:${NC}"
+        echo "  hnm search index myfile.txt    - Index a specific file"
+        echo "  hnm search build               - Index all pinned content"
+        echo "  hnm search query \"machine learning\" - Search for content"
+        echo "  hnm search list                - Show indexed content"
+        echo ""
+        echo -e "${BLUE}💡 Note:${NC} Semantic search requires HuddleAI API key"
+        echo "     Configure with: ./api_key_manager.sh setup"
+        echo ""
+        return 0
+    fi
+    
+    # Route to search manager
+    if check_manager "$SEARCH_MANAGER"; then
+        "$SEARCH_MANAGER" "$@"
+    else
+        log_warning "Search functionality requires search manager"
+        log_info "Available: $SEARCH_MANAGER"
+        log_info "Basic content listing available via: hnm content list"
+    fi
+}
+
+# Configuration management
+manage_config() {
+    case "$1" in
+        show|view)
+            if [ -f "$HNM_CONFIG" ]; then
+                log_info "HNM Configuration:"
+                cat "$HNM_CONFIG" | jq . 2>/dev/null || cat "$HNM_CONFIG"
+            else
+                log_warning "No configuration file found"
+            fi
+            ;;
+        edit)
+            if command -v nano >/dev/null 2>&1; then
+                nano "$HNM_CONFIG"
+            elif command -v vim >/dev/null 2>&1; then
+                vim "$HNM_CONFIG"
+            else
+                log_error "No text editor found (nano/vim)"
+            fi
+            ;;
+        reset)
+            rm -f "$HNM_CONFIG"
+            setup_hnm
+            ;;
+        *)
+            echo -e "${PURPLE}⚙️  Configuration Management${NC}"
+            echo ""
+            echo -e "${YELLOW}Usage:${NC} hnm config [command]"
+            echo ""
+            echo -e "${YELLOW}Commands:${NC}"
+            echo "  show   - Show current configuration"
+            echo "  edit   - Edit configuration file"
+            echo "  reset  - Reset to default configuration"
+            ;;
+    esac
+}
+
+# View logs
+view_logs() {
+    log_info "Recent HNM activity:"
+    
+    if check_manager "$DAEMON_MANAGER"; then
+        "$DAEMON_MANAGER" logs
+    else
+        log_warning "Daemon manager not found. Showing basic IPFS logs:"
+        if command -v ipfs &> /dev/null; then
+            ipfs log tail 2>/dev/null || echo "No IPFS logs available"
+        else
+            log_error "IPFS not installed"
+        fi
+    fi
+}
+
+# Update HNM
+update_hnm() {
+    log_step "Checking for HNM updates..."
+    log_info "Current version: $HNM_VERSION"
+    log_warning "Update functionality coming soon!"
+    
+    # Show legacy command info
+    echo ""
+    log_info "💡 Legacy Command Migration:"
+    echo "   Old: ipfs-manager-version"
+    echo "   New: hnm update"
+}
+
+# Troubleshooting
+troubleshoot() {
+    if [ -z "$1" ]; then
+        echo -e "${PURPLE}🔧 Troubleshooting${NC}"
+        echo ""
+        echo -e "${YELLOW}Usage:${NC} hnm troubleshoot [command]"
+        echo ""
+        echo -e "${YELLOW}Commands:${NC}"
+        echo "  all      - Run all diagnostic checks"
+        echo "  daemon   - Check daemon issues"
+        echo "  api      - Check API connectivity"
+        echo "  content  - Check content issues"
+        echo ""
+        return 0
+    fi
+    
+    # Route to troubleshoot manager
+    if check_manager "$TROUBLESHOOT_MANAGER"; then
+        "$TROUBLESHOOT_MANAGER" "$@"
+    else
+        log_warning "Advanced troubleshooting requires troubleshoot manager"
+        # Basic troubleshooting fallback
+        case "$1" in
+            "daemon"|"all")
+                log_info "Checking IPFS daemon status..."
+                if command -v ipfs &> /dev/null; then
+                    if ipfs swarm peers &>/dev/null; then
+                        echo -e "${GREEN}✅ IPFS daemon is running${NC}"
+                    else
+                        echo -e "${RED}❌ IPFS daemon is not running${NC}"
+                        log_info "Try: hnm start"
+                    fi
+                else
+                    echo -e "${RED}❌ IPFS not installed${NC}"
+                fi
+                ;;
+            *)
+                log_info "Available: daemon status check only"
+                ;;
+        esac
+    fi
+}
+
+# Uninstall HNM
+uninstall_hnm() {
+    log_warning "This will remove HNM configuration and logs"
+    log_info "IPFS data and original installation files will remain intact"
+    echo -n "Are you sure? (y/N): "
+    read -r confirm
+    
+    if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+        log_step "Removing HNM configuration..."
+        rm -rf "$HNM_HOME"
+        
+        # Remove HNM binary if installed
+        if [ -f "$HOME/.local/bin/hnm" ]; then
+            rm -f "$HOME/.local/bin/hnm"
+            log_info "Removed user HNM installation"
+        fi
+        
+        log_success "HNM configuration removed"
+        log_info "Original Huddle IPFS Node Manager files remain intact"
+        
+        # Show legacy command info if called via legacy command
+        if [ "$(basename "$0")" = "ipfs-manager-uninstall" ]; then
+            echo ""
+            log_info "💡 Legacy Command Notice:"
+            echo "   You used: ipfs-manager-uninstall"
+            echo "   This removed the HNM wrapper only"
+            echo "   Your original IPFS installation is still available"
+        fi
+    else
+        log_info "Uninstall cancelled"
+    fi
+}
+
+# Open WebUI
+open_webui() {
+    log_step "Opening IPFS WebUI..."
+    
+    if [ -f "$WEBUI_SCRIPT" ] && [ -x "$WEBUI_SCRIPT" ]; then
+        "$WEBUI_SCRIPT"
+    else
+        # Fallback to basic WebUI opening
+        log_warning "WebUI script not found, using basic method"
+        
+        # Try to get API address and open WebUI
+        if command -v ipfs >/dev/null 2>&1; then
+            API_ADDR=$(ipfs config Addresses.API 2>/dev/null)
+            if [ -n "$API_ADDR" ]; then
+                # Parse the address (format: /ip4/127.0.0.1/tcp/5001)
+                HOST=$(echo "$API_ADDR" | grep -o '/ip[46]/[^/]*' | head -1 | cut -d'/' -f3)
+                PORT=$(echo "$API_ADDR" | grep -o '/tcp/[0-9]*' | head -1 | cut -d'/' -f3)
+                
+                if [ -n "$HOST" ] && [ -n "$PORT" ]; then
+                    WEBUI_URL="http://$HOST:$PORT/webui"
+                    log_success "WebUI available at: $WEBUI_URL"
+                    
+                    case "$(uname -s)" in
+                        Darwin*) open "$WEBUI_URL" ;;
+                        Linux*) 
+                            if command -v xdg-open >/dev/null 2>&1; then
+                                xdg-open "$WEBUI_URL"
+                            fi
+                            ;;
+                    esac
+                else
+                    log_error "Could not parse API address"
+                fi
+            else
+                log_error "Could not get IPFS API address"
+            fi
+        else
+            log_error "IPFS command not found"
+        fi
+    fi
+}
+
+# Modern API key management
+manage_keys() {
+    if [ -z "$1" ]; then
+        echo -e "${PURPLE}🔑 API Key Management${NC}"
+        echo ""
+        echo -e "${YELLOW}Usage:${NC} hnm keys [command] [options]"
+        echo ""
+        echo -e "${YELLOW}Commands:${NC}"
+        echo "  status           - Check API key status"
+        echo "  setup            - Setup new API key"
+        echo "  reset            - Reset API key configuration"
+        echo "  fix              - Check and fix corrupted API key (auto-repair)"
+        echo "  search [term]    - Search for API keys in common locations"
+        echo "  find [pattern]   - Find API key files using patterns"
+        echo "  list             - List all API configurations"
+        echo "  grep [term]      - Search for API key patterns in files"
+        echo "  troubleshoot     - Run API key diagnostics"
+        echo ""
+        echo -e "${YELLOW}Examples:${NC}"
+        echo "  hnm keys status              # Check current API key"
+        echo "  hnm keys fix                 # Auto-detect and fix corrupted keys"
+        echo "  hnm keys search huddle       # Search for 'huddle' in key locations"
+        echo "  hnm keys find '*api*'        # Find files matching API patterns"
+        echo "  hnm keys list                # Show complete configuration"
+        echo "  hnm keys grep API_KEY ~/.env # Search for patterns in files"
+        echo ""
+        return 0
+    fi
+    
+    # Route to API key manager
+    if check_manager "$API_KEY_MANAGER"; then
+        case "$1" in
+            "status")
+                "$API_KEY_MANAGER" check
+                ;;
+            "setup")
+                "$API_KEY_MANAGER" setup
+                ;;
+            "reset")
+                "$API_KEY_MANAGER" reset
+                ;;
+            "fix")
+                "$API_KEY_MANAGER" fix
+                ;;
+            "search")
+                "$API_KEY_MANAGER" search "$2"
+                ;;
+            "find")
+                "$API_KEY_MANAGER" find "$2" "$3"
+                ;;
+            "list"|"ls")
+                "$API_KEY_MANAGER" list
+                ;;
+            "grep")
+                "$API_KEY_MANAGER" grep "$2" "$3"
+                ;;
+            "troubleshoot")
+                "$API_KEY_MANAGER" troubleshoot
+                ;;
+            *)
+                "$API_KEY_MANAGER" "$@"
+                ;;
+        esac
+    else
+        log_warning "API key management requires api_key_manager.sh"
+    fi
+}
+
+# Show help
+show_help() {
+    echo ""
+    echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║                 ${YELLOW}HUDDLE NODE MANAGER (HNM)${BLUE}                 ║${NC}"
+    echo -e "${BLUE}║                ${GREEN}Modern IPFS Management${BLUE}                   ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${CYAN}Modern IPFS node management with enhanced UX${NC}"
+    echo -e "${YELLOW}Version: $HNM_VERSION${NC}"
+    echo ""
+    echo -e "${YELLOW}Usage:${NC} hnm [command] [options]"
+    echo ""
+    echo -e "${YELLOW}Core Commands:${NC}"
+    echo "  setup      - Initialize HNM and IPFS node"
+    echo "  start      - Start node services"
+    echo "  stop       - Stop node services"
+    echo "  restart    - Restart node services"
+    echo "  status     - Show node status"
+    echo "  webui      - Open IPFS WebUI in browser"
+    echo ""
+    echo -e "${YELLOW}Management Commands:${NC}"
+    echo "  content    - Manage IPFS content"
+    echo "  community  - Manage peer connections"
+    echo "  keys       - Modern API key management"
+    echo "  search     - Search and index content"
+    echo "  config     - Manage configuration"
+    echo ""
+    echo -e "${YELLOW}Utility Commands:${NC}"
+    echo "  logs       - View recent logs"
+    echo "  update     - Update HNM"
+    echo "  troubleshoot - Diagnostic tools"
+    echo "  verify     - Verify installation"
+    echo "  server     - Start AI servers"
+    echo "  script     - Run Python scripts"
+    echo "  docker     - Docker environment management"
+    echo "  test       - Cross-platform testing"
+    echo "  uninstall  - Remove HNM"
+    echo "  help       - Show this help"
+    echo ""
+    echo -e "${YELLOW}Examples:${NC}"
+    echo "  hnm keys search huddle           # Search for existing API keys"
+    echo "  hnm keys find '*api*'            # Find API key files"
+    echo "  hnm keys list                    # Show complete key configuration"
+    echo "  hnm troubleshoot api-key         # API key diagnostics"
+    echo "  hnm content add myfile.txt       # Add file to IPFS"
+    echo "  hnm community peers              # Show connected peers"
+    echo "  hnm docker build                 # Build Docker environments"
+    echo "  hnm test cross-platform          # Test all platforms"
+    echo ""
+    echo -e "${YELLOW}Legacy Command Compatibility:${NC}"
+    echo "  ipfs-setup           → hnm setup"
+    echo "  ipfs-manager         → hnm help"
+    echo "  ipfs-manager-version → hnm --version"
+    echo "  ipfs-manager-uninstall → hnm uninstall"
+    echo ""
+    echo -e "${CYAN}For more help: hnm [command] help${NC}"
+}
+
+# Verify installation
+verify_installation() {
+    log_step "Running installation verification..."
+    
+    # Use the wrapper script to run verification
+    if [ -f "$HNM_LIB_DIR/run_hnm_script.sh" ]; then
+        "$HNM_LIB_DIR/run_hnm_script.sh" verify_installation.py "$@"
+    else
+        log_error "HNM script runner not found"
+        log_info "Please reinstall HNM: ./install-hnm-complete.sh"
+    fi
+}
+
+# Run GGUF server
+run_server() {
+    case "$1" in
+        "gguf"|"llama")
+            log_step "Starting GGUF server..."
+            
+            # Kill any existing process on port 8002
+            log_info "Checking for existing processes on port 8002..."
+            EXISTING_PID=$(lsof -ti:8002 2>/dev/null)
+            if [ -n "$EXISTING_PID" ]; then
+                log_warning "Found existing process on port 8002 (PID: $EXISTING_PID), killing it..."
+                kill -9 "$EXISTING_PID" 2>/dev/null
+                sleep 2
+            fi
+            
+            if [ -f "$HNM_LIB_DIR/run_hnm_script.sh" ]; then
+                "$HNM_LIB_DIR/run_hnm_script.sh" optimized_gguf_server.py
+            else
+                log_error "HNM script runner not found"
+            fi
+            ;;
+        "resource")
+            log_step "Starting resource server..."
+            
+            # Kill any existing process on port 8002 (both servers use 8002)
+            log_info "Checking for existing processes on port 8002..."
+            EXISTING_PID=$(lsof -ti:8002 2>/dev/null)
+            if [ -n "$EXISTING_PID" ]; then
+                log_warning "Found existing process on port 8002 (PID: $EXISTING_PID), killing it..."
+                kill -9 "$EXISTING_PID" 2>/dev/null
+                sleep 2
+            fi
+            
+            if [ -f "$HNM_LIB_DIR/run_hnm_script.sh" ]; then
+                "$HNM_LIB_DIR/run_hnm_script.sh" optimized_resource_server.py
+            else
+                log_error "HNM script runner not found"
+            fi
+            ;;
+        *)
+            echo -e "${PURPLE}🚀 Server Management${NC}"
+            echo ""
+            echo -e "${YELLOW}Usage:${NC} hnm server [type]"
+            echo ""
+            echo -e "${YELLOW}Types:${NC}"
+            echo "  gguf     - Start GGUF/Llama server (port 8002)"
+            echo "  resource - Start resource server (port 8002)"
+            echo ""
+            echo -e "${YELLOW}Examples:${NC}"
+            echo "  hnm server gguf     # Start GGUF server"
+            echo "  hnm server resource # Start resource server"
+            echo ""
+            echo -e "${YELLOW}Features:${NC}"
+            echo "  • Automatic port conflict resolution"
+            echo "  • Kills existing processes before starting"
+            echo "  • Safe process management"
+            ;;
+    esac
+}
+
+# Docker environment management
+manage_docker() {
+    if [ -z "$1" ]; then
+        echo -e "${PURPLE}🐳 Docker Environment Management${NC}"
+        echo ""
+        echo -e "${YELLOW}Usage:${NC} hnm docker [command] [options]"
+        echo ""
+        echo -e "${YELLOW}Commands:${NC}"
+        echo "  build              - Build Docker test environments"
+        echo "  test               - Test HNM in Docker environments"
+        echo "  list               - List available Docker environments"
+        echo "  clean              - Clean up Docker images and containers"
+        echo "  interactive        - Interactive Docker testing menu"
+        echo "  quick <os#> [arch#] - Quick select by number"
+        echo ""
+        echo -e "${YELLOW}Examples:${NC}"
+        echo "  hnm docker build              # Build all environments"
+        echo "  hnm docker test ubuntu22      # Test on Ubuntu 22.04"
+        echo "  hnm docker list               # Show available images"
+        echo "  hnm docker interactive        # Interactive menu"
+        echo "  hnm docker quick 2 2          # Ubuntu 22.04 ARM64"
+        echo ""
+        echo -e "${BLUE}💡 Quick Start:${NC}"
+        echo "  1. Run 'hnm docker build' to create test environments"
+        echo "  2. Run 'hnm docker list' to see available images"
+        echo "  3. Run 'hnm docker test ubuntu22' to test on Ubuntu"
+        echo ""
+        echo -e "${BLUE}💡 Note:${NC} Requires Docker to be installed and running"
+        return 0
+    fi
+    
+    # Check if Docker infrastructure exists
+    if [ ! -f "$DOCKER_BUILD_SCRIPT" ]; then
+        log_error "Docker infrastructure not found at: $DOCKER_BUILD_SCRIPT"
+        log_info "Please ensure HNM is properly installed with Docker support"
+        return 1
+    fi
+    
+    # Make sure the script is executable
+    if [ ! -x "$DOCKER_BUILD_SCRIPT" ]; then
+        chmod +x "$DOCKER_BUILD_SCRIPT"
+    fi
+    
+    # Route to Docker build script
+    log_step "Running Docker command: $1"
+    
+    # Special handling for list command when no images exist
+    if [ "$1" = "list" ]; then
+        "$DOCKER_BUILD_SCRIPT" "$@"
+        if [ $? -eq 0 ]; then
+            echo ""
+            echo -e "${BLUE}💡 Next Steps:${NC}"
+            echo "  • Run 'hnm docker build' to create test environments"
+            echo "  • Run 'hnm docker interactive' for guided setup"
+            echo "  • Run 'hnm docker build ubuntu22' to build specific OS"
+        fi
+    else
+        "$DOCKER_BUILD_SCRIPT" "$@"
+    fi
+}
+
+# Cross-platform testing
+run_tests() {
+    if [ -z "$1" ]; then
+        echo -e "${PURPLE}🧪 Cross-Platform Testing${NC}"
+        echo ""
+        echo -e "${YELLOW}Usage:${NC} hnm test [platform] [options]"
+        echo ""
+        echo -e "${YELLOW}Platforms:${NC}"
+        echo "  cross-platform    - Test all platforms (Docker + Native)"
+        echo "  linux             - Test Linux compatibility"
+        echo "  windows           - Test Windows compatibility"
+        echo "  docker            - Test Docker environments"
+        echo "  dynamic           - Run dynamic installation test"
+        echo "  macos             - Test macOS installation paths"
+        echo ""
+        echo -e "${YELLOW}Examples:${NC}"
+        echo "  hnm test cross-platform      # Test all platforms"
+        echo "  hnm test linux               # Test Linux compatibility"
+        echo "  hnm test windows             # Test Windows compatibility"
+        echo "  hnm test dynamic             # Run dynamic test"
+        echo "  hnm test macos               # Test macOS installation"
+        echo ""
+        echo -e "${BLUE}💡 Note:${NC} Some tests require Docker or specific environments"
+        return 0
+    fi
+    
+    case "$1" in
+        "cross-platform")
+            log_step "Running cross-platform tests..."
+            if [ -f "$TEST_DYNAMIC_SCRIPT" ]; then
+                chmod +x "$TEST_DYNAMIC_SCRIPT"
+                "$TEST_DYNAMIC_SCRIPT"
+            else
+                log_error "Dynamic test script not found"
+            fi
+            
+            if [ -f "$TEST_LINUX_SCRIPT" ]; then
+                chmod +x "$TEST_LINUX_SCRIPT"
+                "$TEST_LINUX_SCRIPT"
+            else
+                log_warning "Linux test script not found"
+            fi
+            
+            if [ -f "$TEST_WINDOWS_SCRIPT" ]; then
+                log_info "Windows test script available: $TEST_WINDOWS_SCRIPT"
+            else
+                log_warning "Windows test script not found"
+            fi
+            ;;
+        "linux")
+            log_step "Testing Linux compatibility..."
+            if [ -f "$TEST_LINUX_SCRIPT" ]; then
+                chmod +x "$TEST_LINUX_SCRIPT"
+                "$TEST_LINUX_SCRIPT"
+            else
+                log_error "Linux test script not found at: $TEST_LINUX_SCRIPT"
+            fi
+            ;;
+        "windows")
+            log_step "Testing Windows compatibility..."
+            if [ -f "$TEST_WINDOWS_SCRIPT" ]; then
+                log_info "Windows test script available: $TEST_WINDOWS_SCRIPT"
+                log_info "Run manually on Windows or in WSL"
+            else
+                log_error "Windows test script not found at: $TEST_WINDOWS_SCRIPT"
+            fi
+            ;;
+        "docker")
+            log_step "Testing Docker environments..."
+            manage_docker test
+            ;;
+        "dynamic")
+            log_step "Running dynamic installation test..."
+            if [ -f "$TEST_DYNAMIC_SCRIPT" ]; then
+                chmod +x "$TEST_DYNAMIC_SCRIPT"
+                "$TEST_DYNAMIC_SCRIPT"
+            else
+                log_error "Dynamic test script not found at: $TEST_DYNAMIC_SCRIPT"
+            fi
+            ;;
+        "macos")
+            log_step "Testing macOS installation paths..."
+            if [ -f "$TEST_MACOS_SCRIPT" ]; then
+                chmod +x "$TEST_MACOS_SCRIPT"
+                "$TEST_MACOS_SCRIPT"
+            else
+                log_error "macOS test script not found at: $TEST_MACOS_SCRIPT"
+            fi
+            ;;
+        *)
+            log_error "Unknown test platform: $1"
+            echo ""
+            echo -e "${YELLOW}Available platforms:${NC}"
+            echo "  cross-platform, linux, windows, docker, dynamic, macos"
+            ;;
+    esac
+}
+
+# Run Python scripts
+run_script() {
+    if [ -z "$1" ]; then
+        echo -e "${PURPLE}📜 Script Runner${NC}"
+        echo ""
+        echo -e "${YELLOW}Usage:${NC} hnm script <script_name> [arguments]"
+        echo ""
+        echo -e "${YELLOW}Available Scripts:${NC}"
+        echo "  verify_installation.py     - Verify HNM installation"
+        echo "  optimized_gguf_server.py   - Start GGUF server"
+        echo "  optimized_resource_server.py - Start resource server"
+        echo "  device_detection_test.py   - Test device detection"
+        echo "  resource_monitor.py        - Monitor system resources"
+        echo "  setup_dependencies.py      - Setup dependencies"
+        echo ""
+        echo -e "${YELLOW}Examples:${NC}"
+        echo "  hnm script verify_installation.py"
+        echo "  hnm script optimized_gguf_server.py"
+        echo "  hnm script device_detection_test.py"
+        return 0
+    fi
+    
+    log_step "Running script: $1"
+    
+    if [ -f "$HNM_LIB_DIR/run_hnm_script.sh" ]; then
+        "$HNM_LIB_DIR/run_hnm_script.sh" "$@"
+    else
+        log_error "HNM script runner not found"
+        log_info "Please reinstall HNM: ./install-hnm-complete.sh"
+    fi
+}
+
+# Main command dispatcher
+main() {
+    # First check if this is a legacy command call
+    if handle_legacy_command "$@"; then
+        return 0
+    fi
+    
+    # Check if no arguments provided
+    if [ $# -eq 0 ]; then
+        show_help
+        return 0
+    fi
+    
+    # Get the command
+    command="$1"
+    shift
+    
+    # Route commands
+    case "$command" in
+        "setup")
+            setup_hnm
+            ;;
+        "start")
+            start_services
+            ;;
+        "stop")
+            stop_services
+            ;;
+        "restart")
+            restart_services
+            ;;
+        "status")
+            show_status
+            ;;
+        "webui")
+            open_webui
+            ;;
+        "content")
+            manage_content "$@"
+            ;;
+        "community")
+            manage_community "$@"
+            ;;
+        "keys"|"key")
+            manage_keys "$@"
+            ;;
+        "search")
+            manage_search "$@"
+            ;;
+        "config")
+            manage_config "$@"
+            ;;
+        "logs")
+            view_logs
+            ;;
+        "update")
+            update_hnm
+            ;;
+        "troubleshoot")
+            troubleshoot "$@"
+            ;;
+        "verify")
+            verify_installation
+            ;;
+        "server")
+            run_server "$@"
+            ;;
+        "script")
+            run_script "$@"
+            ;;
+        "docker")
+            manage_docker "$@"
+            ;;
+        "test")
+            run_tests "$@"
+            ;;
+        "uninstall")
+            uninstall_hnm
+            ;;
+        "help"|"--help"|"-h")
+            show_help
+            ;;
+        "--version"|"-v")
+            echo "Huddle Node Manager (HNM) v$HNM_VERSION"
+            ;;
+        *)
+            echo -e "${RED}❌ Unknown command: $command${NC}"
+            echo ""
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@" 
