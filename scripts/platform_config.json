@@ -1,0 +1,57 @@
+{
+  "platform_info": {
+    "platform": "macos_apple_silicon",
+    "capabilities": {
+      "platform": "macos_apple_silicon",
+      "cuda_available": false,
+      "mps_available": true,
+      "cpu_cores": 8,
+      "device_count": 0,
+      "mps_device": "Apple Silicon GPU"
+    },
+    "available_models": {
+      "llama-3.2-3b-quantized-q4km": true,
+      "llama-3.2-3b-instruct-optimized": false,
+      "llama-3.2-3b-instruct": false,
+      "llama-3.2-3b-instruct-quantized": false,
+      "llama-3.2-3b-instruct-backup": false
+    }
+  },
+  "model_config": {
+    "model_path": "llama-3.2-3b-quantized-q4km",
+    "optimization_strategy": "apple_silicon_quantized_gguf",
+    "device": "mps",
+    "dtype": "q4_k_m",
+    "batch_size": 12,
+    "max_concurrent_requests": 24,
+    "memory_fraction": 0.15,
+    "use_cache": true,
+    "attention_implementation": "llama_cpp",
+    "conservative_mode": false,
+    "reasoning": [
+      "Using quantized GGUF model (1.9GB vs 6GB)",
+      "Q4_K_M quantization for 99% quality at 3x speed",
+      "MPS device for GPU acceleration",
+      "Higher batch size due to memory efficiency",
+      "llama.cpp for optimized GGUF inference"
+    ],
+    "model_format": "gguf",
+    "quantization": "Q4_K_M"
+  },
+  "server_settings": {
+    "host": "0.0.0.0",
+    "port": 8002,
+    "workers": 1,
+    "worker_class": "uvicorn.workers.UvicornWorker",
+    "max_requests": 1000,
+    "max_requests_jitter": 100,
+    "keepalive": 5,
+    "timeout_keep_alive": 30
+  },
+  "optimization_settings": {
+    "enable_memory_pooling": true,
+    "enable_gradient_checkpointing": true,
+    "enable_attention_slicing": true,
+    "use_flash_attention": false
+  }
+}
