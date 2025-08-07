@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Huddle Node Manager - GGUF Server</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .status {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .endpoint {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .endpoint strong {
+            color: #ffd700;
+        }
+        .info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Huddle Node Manager</h1>
+        <h2>GGUF Server Status</h2>
+        
+        <div class="status">
+            <h3>✅ Server Running</h3>
+            <p>The GGUF server is active and ready to process requests.</p>
+        </div>
+        
+        <div class="info">
+            <h3>📋 Available Endpoints:</h3>
+            <div class="endpoint">
+                <strong>POST /v1/chat/completions</strong> - Chat completions
+            </div>
+            <div class="endpoint">
+                <strong>POST /v1/completions</strong> - Text completions
+            </div>
+            <div class="endpoint">
+                <strong>GET /v1/models</strong> - List available models
+            </div>
+            <div class="endpoint">
+                <strong>GET /health</strong> - Health check
+            </div>
+        </div>
+        
+        <div class="info">
+            <h3>🔧 Usage:</h3>
+            <p>Use the API endpoints above to interact with the GGUF models. The server supports OpenAI-compatible API calls.</p>
+        </div>
+        
+        <div class="info">
+            <h3>📊 System Info:</h3>
+            <p>• Platform: macOS (Apple Silicon)</p>
+            <p>• Device: MPS (Metal Performance Shaders)</p>
+            <p>• Models: Llama-3.2-3B Quantized</p>
+        </div>
+    </div>
+</body>
+</html> 
