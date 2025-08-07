@@ -1,0 +1,44 @@
+version: '3'
+
+services:
+  linux:
+    build:
+      context: ./
+      dockerfile: Dockerfile.linux
+    container_name: hnm-linux
+    volumes:
+      - ..:/home/huddle/huddle-node-manager
+    tty: true
+    stdin_open: true
+
+  wsl:
+    build:
+      context: ./
+      dockerfile: Dockerfile.wsl
+    container_name: hnm-wsl
+    volumes:
+      - ..:/home/huddle/huddle-node-manager
+    tty: true
+    stdin_open: true
+    cap_add:
+      - SYS_ADMIN  # Needed for mount operations
+
+  mingw:
+    build:
+      context: ./
+      dockerfile: Dockerfile.mingw
+    container_name: hnm-mingw
+    volumes:
+      - ..:/home/huddle/huddle-node-manager
+    tty: true
+    stdin_open: true
+
+  macos:
+    build:
+      context: ./
+      dockerfile: Dockerfile.macos
+    container_name: hnm-macos
+    volumes:
+      - ..:/home/huddle/huddle-node-manager
+    tty: true
+    stdin_open: true 

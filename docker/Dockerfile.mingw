@@ -1,0 +1,46 @@
+FROM ubuntu:22.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV MSYSTEM=MINGW64
+ENV MSYS=winsymlinks:nativestrict
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    sudo \
+    python3 \
+    python3-pip \
+    bash \
+    jq \
+    unzip \
+    vim \
+    nano \
+    iputils-ping \
+    net-tools \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+RUN useradd -m -s /bin/bash huddle && \
+    echo "huddle ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/huddle
+
+# Create MinGW/Git Bash specific directories
+RUN mkdir -p /c && \
+    ln -s /c /mnt/c
+
+# Switch to the non-root user
+USER huddle
+WORKDIR /home/huddle
+
+# Create the huddle-node-manager directory
+RUN mkdir -p huddle-node-manager
+
+# Copy only the entrypoint script
+COPY --chown=huddle:huddle scripts/entrypoint-mingw.sh /home/huddle/entrypoint.sh
+RUN chmod +x /home/huddle/entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/home/huddle/entrypoint.sh"] 
